@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>StudyFlow Pro</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+/* ===== RESET & BASE ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: #f3f4f8;
+  height: 100vh;
+  overflow: hidden;
+  transition: background 0.3s ease; /* Faster transition for performance */
+  /* Prevent bounce on iOS */
+  position: fixed;
+  width: 100%;
+}
+
+/* ===== DARK MODE STYLES ===== */
+body.dark-mode { background: #121212; color: #e0e0e0; }
+.dark-mode .card { background: #1e1e1e; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.dark-mode .card h2 { color: #ffffff; }
+.dark-mode input, .dark-mode select, .dark-mode textarea { background: #2d2d2d; border-color: #444; color: white; }
+.dark-mode .nav-dock { background: rgba(30, 30, 30, 0.98); border-color: rgba(255,255,255,0.1); }
+.dark-mode .nav-icon.active { color: #2ed573; }
+.dark-mode .mode-btn { color: #888; }
+.dark-mode .mode-btn.active { background: #333; color: white; }
+.dark-mode .day-chip { background: #333; color: #888; }
+.dark-mode .day-chip.active { background: #2ed573 !important; color: #121212 !important; }
+.dark-mode .schedule-block { background: #252525; }
+.dark-mode .stat-card { background: #2d2d2d; }
+
+/* ===== DEEP WORK MODE - OPTIMIZED ===== */
+body.deep-work-active { background: #000000 !important; }
+.deep-work-active .header, .deep-work-active .nav-dock, .deep-work-active .card h2, .deep-work-active .mode-switch, .deep-work-active .timer-presets {
+  opacity: 0 !important; pointer-events: none; transform: translateY(10px);
+}
+.deep-work-active .card { background: transparent !important; box-shadow: none !important; }
+.deep-work-active #timerDisplay { color: #ffffff; font-size: 90px; }
+
+/* ===== HEADER & PANELS ===== */
+.header {
+  background: linear-gradient(135deg, #1e1e1e, #3a3a3a);
+  color: white; text-align: center; padding: 35px 20px 20px;
+  border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1); position: relative; z-index: 10;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.header h1 { font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+.header p { opacity: 0.8; font-size: 14px; margin-top: 5px; }
+.theme-toggle {
+  position: absolute; top: 35px; right: 25px; background: rgba(255,255,255,0.1);
+  border: none; color: white; width: 40px; height: 40px; border-radius: 12px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+
+/* FIX: SWIPE PERFORMANCE */
+.container {
+  display: flex; 
+  overflow-x: auto; 
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch; /* Momentum scroll */
+  height: calc(100vh - 180px); 
+  padding-bottom: 20px; 
+  scroll-behavior: smooth; 
+  will-change: scroll-position; /* Prepares browser for scrolling */
+}
+.container::-webkit-scrollbar { display: none; }
+
+.panel { 
+  min-width: 100%; 
+  scroll-snap-align: start; 
+  padding: 20px; 
+  overflow-y: auto; 
+  padding-bottom: 120px;
+  transform: translateZ(0); /* Hardware Acceleration */
+  backface-visibility: hidden;
+}
+
+.card { 
+  background: white; 
+  border-radius: 25px; 
+  padding: 25px; 
+  min-height: 60vh; 
+  box-shadow: 0 8px 30px rgba(0,0,0,0.05); 
+  transition: transform 0.3s ease; 
+  position: relative; 
+}
+.card h2 { margin-bottom: 20px; color: #333; font-size: 22px; transition: 0.3s ease; }
+
+/* ===== DAY SELECTOR & CHIPS ===== */
+.day-chip { 
+  padding: 8px 16px; 
+  background: #eee; 
+  border-radius: 20px; 
+  font-size: 12px; 
+  font-weight: bold; 
+  cursor: pointer; 
+  white-space: nowrap; 
+  color: #555;
+  transition: background 0.2s;
+}
+.day-chip.active { 
+  background: #2f3542 !important; 
+  color: white !important; 
+}
+
+/* ===== TASKS & STATS ===== */
+.stats-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.stat-card { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 20px; text-align: center; }
+.stat-card i { font-size: 20px; color: #2ed573; margin-bottom: 5px; }
+.stat-card b { display: block; font-size: 18px; }
+.stat-card span { font-size: 10px; color: #777; text-transform: uppercase; }
+
+.task { background: white; padding: 16px; border-radius: 16px; margin-bottom: 15px; transition: transform 0.2s; border-left: 5px solid #ccc; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+.dark-mode .task { background: #252525; }
+.badge { display: inline-block; padding: 5px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; color: white; text-transform: uppercase; margin-bottom: 5px; }
+.p-High { background: #ff4757; } .p-Medium { background: #ffa502; } .p-Low { background: #1e90ff; }
+.task-actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn-sm { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 12px; color: white; cursor: pointer; font-weight: bold; }
+.btn-done { background: #2ed573; } .btn-del { background: #ff4757; } .btn-restore { background: #1e90ff; }
+
+/* ===== DIARY SPECIFIC ===== */
+.diary-card { background: #fff; padding: 15px; border-radius: 18px; margin-bottom: 15px; border: 1px solid #eee; }
+.dark-mode .diary-card { background: #252525; border-color: #333; }
+.blue-plus-btn { background: #1e90ff; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: 0 5px 15px rgba(30,144,255,0.3); transition: 0.2s; }
+.blue-plus-btn:active { transform: scale(0.9); }
+.diary-editor-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: inherit; z-index: 50; padding: 25px; border-radius: 25px; }
+
+/* ===== NAV DOCK - PERFORMANCE OPTIMIZED ===== */
+.nav-dock {
+  position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+  width: 90%; max-width: 500px; height: 70px; background: rgba(255, 255, 255, 0.98);
+  border-radius: 35px; display: flex; justify-content: space-evenly;
+  align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 1000; border: 1px solid rgba(255,255,255,0.5);
+  backdrop-filter: blur(10px); /* Keep blur but use opaque bg to help performance */
+}
+.nav-icon { background: none; border: none; font-size: 20px; color: #a4b0be; cursor: pointer; position: relative; transition: color 0.3s, transform 0.3s; }
+.nav-icon.active { color: #2f3542; transform: translateY(-5px); }
+.dark-mode .nav-icon.active { color: #2ed573; }
+.nav-icon.active::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; background: #2f3542; border-radius: 50%; }
+.dark-mode .nav-icon.active::after { background: #2ed573; }
+.nav-fab { width: 60px; height: 60px; background: #2f3542; border-radius: 50%; border: 4px solid #f3f4f8; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; margin-top: -30px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+
+/* ===== MODAL ===== */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; }
+.modal-content { background: white; padding: 25px; border-radius: 20px; width: 85%; max-width: 300px; text-align: center; }
+.dark-mode .modal-content { background: #1e1e1e; color: white; }
+
+/* ===== GENERAL UI ===== */
+input, select, textarea { width: 100%; padding: 16px; border-radius: 18px; border: 2px solid #f0f0f0; background: #f9f9f9; margin-bottom: 12px; font-size: 15px; outline: none; }
+textarea { height: 150px; resize: none; }
+.progress-track { width: 100%; height: 10px; background: #eee; border-radius: 10px; overflow: hidden; margin: 15px 0; }
+.progress-fill { height: 100%; background: #2ed573; width: 0%; transition: width 0.5s ease; }
+.timer-display { font-size: 60px; font-weight: 800; color: #2f3542; margin: 15px 0; }
+.dark-mode .timer-display { color: white; }
+.timer-btn { padding: 15px 30px; border: none; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; }
+.btn-start { background: #2ed573; } .btn-reset { background: #ff4757; }
+.mode-switch { display: flex; background: #eee; padding: 5px; border-radius: 50px; margin: 0 auto 15px; width: fit-content; }
+.mode-btn { padding: 8px 20px; border: none; background: transparent; border-radius: 40px; cursor: pointer; font-weight: bold; color: #777; }
+.mode-btn.active { background: white; color: #222; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="theme-toggle" onclick="toggleDarkMode()"><i id="themeIcon" class="fas fa-moon"></i></button>
+  <h1>StudyFlow Pro</h1>
+  <p>Focus. Plan. Achieve.</p>
+</div>
+
+<div class="container" id="slider">
+  <div class="panel"><div class="card"><h2><i class="fas fa-calendar-day"></i> Today's Focus</h2><div id="todayTasks"></div></div></div>
+  <div class="panel"><div class="card"><h2><i class="fas fa-tasks"></i> All Tasks</h2><div id="allTasks"></div></div></div>
+  <div class="panel">
+    <div class="card">
+      <h2><i class="fas fa-calendar-alt"></i> Timetable</h2>
+      <div class="day-selector" id="daySelector" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; margin-bottom:15px;"></div>
+      <div style="background: rgba(0,0,0,0.03); padding: 15px; border-radius: 20px; margin-bottom: 20px;">
+        <input type="time" id="schedTime" style="padding:10px; margin-bottom:8px;">
+        <input type="text" id="schedActivity" placeholder="Activity" style="padding:10px; margin-bottom:12px;">
+        <button onclick="addScheduleItem()" style="width:100%; padding:12px; background:#2f3542; color:white; border:none; border-radius:12px; font-weight:bold;">Add to Schedule</button>
+      </div>
+      <div id="timetableDisplay"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="card">
+      <h2 id="formTitle"><i class="fas fa-edit"></i> New Task</h2>
+      <input id="subject" placeholder="📘 Subject"><input id="title" placeholder="✏️ Task Detail">
+      <select id="priority"><option value="High">🔥 High Priority</option><option value="Medium" selected>⚠️ Medium Priority</option><option value="Low">☕ Low Priority</option></select>
+      <input type="date" id="dueDate"><button id="actionBtn" onclick="saveTask()" style="width:100%; padding:18px; border-radius:20px; border:none; font-size:18px; font-weight:bold; color:white; background:#222; cursor:pointer;">Create Task</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="card" id="diaryMain">
+      <h2><i class="fas fa-book-open"></i> Personal Diary</h2>
+      <div id="diaryList"></div>
+      <div id="emptyDiary" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:300px;">
+        <button class="blue-plus-btn" onclick="openDiaryEditor()"><i class="fas fa-plus"></i></button>
+        <p style="margin-top:15px; color:#888; font-weight:600;">What's on your mind today?</p>
+      </div>
+      <div id="bottomDiaryPlus" style="display:none; text-align:center; padding-top:10px;">
+        <button class="blue-plus-btn" onclick="openDiaryEditor()"><i class="fas fa-plus"></i></button>
+      </div>
+      <div id="diaryEditor" class="diary-editor-overlay">
+        <button onclick="saveDiaryEntry()" style="position:absolute; top:20px; right:20px; padding:8px 20px; background:#2ed573; color:white; border:none; border-radius:12px; font-weight:bold; cursor:pointer;">Save</button>
+        <h3 style="margin-bottom:20px;">Reflect</h3>
+        <input type="text" id="diaryTopic" placeholder="Topic">
+        <textarea id="diaryContent" placeholder="Write your thoughts..."></textarea>
+        <button onclick="closeDiaryEditor()" style="width:100%; background:none; border:none; color:#888; margin-top:10px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="card">
+      <h2><i class="fas fa-stopwatch"></i> Focus Zone</h2>
+      <div class="timer-container" style="text-align:center;">
+        <div class="mode-switch"><button class="mode-btn active" id="modeStudy" onclick="setTimerMode('study', 25)">Study</button><button class="mode-btn" id="modeBreak" onclick="setTimerMode('break', 5)">Break</button></div>
+        <span id="altTimerLink" class="preset-link" onclick="setAltTimer()" style="color:#2ed573; text-decoration:underline; cursor:pointer; font-size:14px; font-weight:600; display:block; margin-bottom:15px;">Switch Mins</span>
+        <div class="timer-display" id="timerDisplay">25:00</div>
+        <div class="timer-controls"><button class="timer-btn btn-start" id="startBtn" onclick="toggleTimer()">Start Focus</button><button class="timer-btn btn-reset" onclick="resetTimer()">Reset</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="card">
+      <h2><i class="fas fa-chart-line"></i> Performance</h2>
+      <div class="stats-row">
+        <div class="stat-card"><i class="fas fa-bolt"></i><b id="statMins">0</b><span>Focus Mins</span></div>
+        <div class="stat-card"><i class="fas fa-fire"></i><b id="statSessions">0</b><span>Sessions</span></div>
+      </div>
+      <div style="text-align:center; padding:10px;"><h3 id="progressText" style="font-size:14px; color:#777;">0% Complete</h3><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
+      <h3 style="margin-top:20px; font-size:16px; color:#ff4757;">Expired</h3><div id="expiredTasks"></div>
+      <h3 style="margin-top:20px; font-size:16px;">Completed</h3><div id="completedTasks"></div>
+      <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
+      <h3 style="font-size:16px; color:#777;"><i class="fas fa-trash"></i> Trash</h3>
+      <div id="trashTasks"></div>
+      <button onclick="emptyTrash()" style="width:100%; margin-top:15px; padding:12px; background:#ff4757; color:white; border:none; border-radius:12px; font-weight:bold;">Empty Trash</button>
+    </div>
+  </div>
+</div>
+
+<div id="deleteModal" class="modal-overlay">
+  <div class="modal-content">
+    <h3>Confirm Delete</h3>
+    <p style="margin:10px 0; color:#777;">Are you sure you want to delete this memory?</p>
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button onclick="closeDeleteModal()" style="flex:1; padding:12px; border-radius:12px; border:none; background:#eee;">Cancel</button>
+      <button id="confirmDelBtn" style="flex:1; padding:12px; border-radius:12px; border:none; background:#ff4757; color:white;">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="nav-dock">
+  <button class="nav-icon active" onclick="goToSlide(0)"><i class="fas fa-home"></i></button>
+  <button class="nav-icon" onclick="goToSlide(1)"><i class="fas fa-list"></i></button>
+  <button class="nav-icon" onclick="goToSlide(2)"><i class="fas fa-calendar-alt"></i></button>
+  <button class="nav-fab" onclick="resetForm(); goToSlide(3)"><i class="fas fa-plus"></i></button>
+  <button class="nav-icon" onclick="goToSlide(4)"><i class="fas fa-book"></i></button>
+  <button class="nav-icon" onclick="goToSlide(5)"><i class="fas fa-clock"></i></button>
+  <button class="nav-icon" onclick="goToSlide(6)"><i class="fas fa-chart-bar"></i></button>
+</div>
+
+<script>
+const STORAGE_KEY = "studyflow_v4", SCHED_KEY = "studyflow_schedule", STATS_KEY = "studyflow_stats", DIARY_KEY = "studyflow_diary";
+let timerInterval, timeLeft = 25 * 60, isRunning = false, currentMode = 'study', currentSchedDay = "Mon", sessionDuration = 25;
+let currentDiaryEditId = null;
+
+/* FIX NAV & SCROLL */
+const slider = document.getElementById("slider");
+function goToSlide(i) { 
+    slider.scrollTo({ left: slider.offsetWidth * i, behavior: "smooth" }); 
+}
+
+// Optimized scroll listener
+let scrollTimeout;
+slider.addEventListener('scroll', () => {
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    const idx = Math.round(slider.scrollLeft / slider.offsetWidth);
+    const icons = document.querySelectorAll(".nav-icon");
+    icons.forEach(icon => icon.classList.remove("active"));
+    let iconMap = [0, 1, 2, -1, 3, 4, 5]; 
+    if(iconMap[idx] !== -1 && icons[iconMap[idx]]) icons[iconMap[idx]].classList.add("active");
+  }, 50); // Small debounce to keep main thread free
+}, { passive: true });
+
+/* DIARY LOGIC */
+function getDiary() { return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; }
+function openDiaryEditor(id = null) {
+  currentDiaryEditId = id;
+  const overlay = document.getElementById("diaryEditor");
+  overlay.style.display = "block";
+  if(id) {
+    const entry = getDiary().find(e => e.id === id);
+    document.getElementById("diaryTopic").value = entry.topic;
+    document.getElementById("diaryContent").value = entry.content;
+  } else {
+    document.getElementById("diaryTopic").value = "";
+    document.getElementById("diaryContent").value = "";
+  }
+}
+function closeDiaryEditor() { document.getElementById("diaryEditor").style.display = "none"; }
+function saveDiaryEntry() {
+  const topic = document.getElementById("diaryTopic").value;
+  const content = document.getElementById("diaryContent").value;
+  if(!topic || !content) return;
+  let entries = getDiary();
+  if(currentDiaryEditId) {
+    let e = entries.find(x => x.id === currentDiaryEditId);
+    e.topic = topic; e.content = content;
+  } else {
+    entries.push({ id: Date.now(), date: new Date().toLocaleDateString(), topic, content });
+  }
+  localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+  closeDiaryEditor(); renderDiary();
+}
+function deleteDiary(id) {
+  document.getElementById("deleteModal").style.display = "flex";
+  document.getElementById("confirmDelBtn").onclick = () => {
+    let entries = getDiary().filter(e => e.id !== id);
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    closeDeleteModal(); renderDiary();
+  };
+}
+function closeDeleteModal() { document.getElementById("deleteModal").style.display = "none"; }
+function renderDiary() {
+  const entries = getDiary();
+  const list = document.getElementById("diaryList");
+  list.innerHTML = "";
+  if(entries.length === 0) {
+    document.getElementById("emptyDiary").style.display = "flex";
+    document.getElementById("bottomDiaryPlus").style.display = "none";
+  } else {
+    document.getElementById("emptyDiary").style.display = "none";
+    document.getElementById("bottomDiaryPlus").style.display = "block";
+    entries.slice().reverse().forEach(e => {
+      list.innerHTML += `<div class="diary-card">
+        <small style="color:#a4b0be; font-weight:bold;">${e.date}</small>
+        <h4 style="margin:5px 0;">${e.topic}</h4>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <button onclick="openDiaryEditor(${e.id})" style="border:none; background:#1e90ff; color:white; padding:5px 12px; border-radius:8px; font-size:12px; cursor:pointer;">Edit</button>
+          <button onclick="deleteDiary(${e.id})" style="border:none; background:#ff4757; color:white; padding:5px 12px; border-radius:8px; font-size:12px; cursor:pointer;">Delete</button>
+        </div>
+      </div>`;
+    });
+  }
+}
+
+/* TIMER LOGIC */
+function setTimerMode(mode, mins) {
+    currentMode = mode; sessionDuration = mins;
+    const link = document.getElementById("altTimerLink");
+    if(mode === 'study') {
+        link.innerText = mins === 25 ? "Switch to 60 Mins" : "Switch to 25 Mins";
+        document.getElementById("modeStudy").classList.add("active");
+        document.getElementById("modeBreak").classList.remove("active");
+    } else {
+        link.innerText = mins === 5 ? "Switch to 10 Mins" : "Switch to 5 Mins";
+        document.getElementById("modeBreak").classList.add("active");
+        document.getElementById("modeStudy").classList.remove("active");
+    }
+    resetTimer();
+}
+function setAltTimer() {
+    if(currentMode === 'study') sessionDuration = (sessionDuration === 25) ? 60 : 25;
+    else sessionDuration = (sessionDuration === 5) ? 10 : 5;
+    setTimerMode(currentMode, sessionDuration);
+}
+function toggleTimer() {
+  if(isRunning) { 
+    clearInterval(timerInterval); 
+    document.getElementById("startBtn").innerText = "Resume"; 
+    document.body.classList.remove("deep-work-active"); 
+  }
+  else {
+    document.body.classList.add("deep-work-active");
+    timerInterval = setInterval(() => {
+      if(timeLeft > 0) { timeLeft--; updateTimerDisplay(); }
+      else { 
+        clearInterval(timerInterval); 
+        resetTimer(); 
+        let s = JSON.parse(localStorage.getItem(STATS_KEY)) || { totalMins: 0, sessions: 0 };
+        if(currentMode === 'study') {
+          s.totalMins += sessionDuration;
+          s.sessions += 1;
+          localStorage.setItem(STATS_KEY, JSON.stringify(s));
+          renderAll();
+        }
+        alert("Session Complete!"); 
+      }
+    }, 1000);
+    document.getElementById("startBtn").innerText = "Pause";
+  }
+  isRunning = !isRunning;
+}
+function resetTimer() { clearInterval(timerInterval); isRunning = false; timeLeft = sessionDuration * 60; document.body.classList.remove("deep-work-active"); document.getElementById("startBtn").innerText = "Start Focus"; updateTimerDisplay(); }
+function updateTimerDisplay() { const m = Math.floor(timeLeft/60).toString().padStart(2,'0'), s = (timeLeft%60).toString().padStart(2,'0'); document.getElementById("timerDisplay").innerText = `${m}:${s}`; }
+
+/* TASK LOGIC */
+function getTasks() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+function saveTasks(tasks) { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+function saveTask() {
+  const subject = document.getElementById("subject").value, title = document.getElementById("title").value, date = document.getElementById("dueDate").value, prio = document.getElementById("priority").value;
+  if(!subject || !title || !date) return;
+  let t = getTasks();
+  t.push({ id: Date.now(), subject, title, dueDate: date, priority: prio, completed: false, deleted: false });
+  saveTasks(t); resetForm(); renderAll(); goToSlide(1);
+}
+function toggleComplete(id) { let t = getTasks(), x = t.find(i => i.id === id); if(x) x.completed = !x.completed; saveTasks(t); renderAll(); }
+function softDelete(id) { let t = getTasks(), x = t.find(i => i.id === id); if(x) x.deleted = true; saveTasks(t); renderAll(); }
+function restoreTask(id) { let t = getTasks(), x = t.find(i => i.id === id); if(x) x.deleted = false; saveTasks(t); renderAll(); }
+function emptyTrash() { saveTasks(getTasks().filter(t => !t.deleted)); renderAll(); }
+
+function renderAll() {
+  const tasks = getTasks(), today = new Date().toISOString().split("T")[0];
+  const cont = { today: document.getElementById("todayTasks"), all: document.getElementById("allTasks"), done: document.getElementById("completedTasks"), expired: document.getElementById("expiredTasks"), trash: document.getElementById("trashTasks") };
+  Object.values(cont).forEach(c => { if(c) c.innerHTML = ""; });
+  tasks.forEach(t => {
+    if(t.deleted) { cont.trash.innerHTML += `<div class="task" style="opacity:0.6;"><b>${t.title}</b><div class="task-actions"><button class="btn-sm btn-restore" onclick="restoreTask(${t.id})">Restore</button></div></div>`; }
+    else if(t.completed) { cont.done.innerHTML += `<div class="task" style="border-left-color:#2ed573"><b>${t.title}</b><div class="task-actions"><button class="btn-sm btn-del" onclick="softDelete(${t.id})">Trash</button></div></div>`; }
+    else {
+        const html = `<div class="task" style="border-left-color: ${t.priority==='High'?'#ff4757':'#ffa502'}"><span class="badge p-${t.priority}">${t.priority}</span><br><b>${t.title}</b><br><small>${t.subject}</small><div class="task-actions"><button class="btn-sm btn-done" onclick="toggleComplete(${t.id})">Done</button><button class="btn-sm btn-del" onclick="softDelete(${t.id})">Trash</button></div></div>`;
+        if(t.dueDate < today) cont.expired.innerHTML += html;
+        else { cont.all.innerHTML += html; if(t.dueDate === today) cont.today.innerHTML += html; }
+    }
+  });
+  const stats = JSON.parse(localStorage.getItem(STATS_KEY)) || { totalMins: 0, sessions: 0 };
+  document.getElementById("statMins").innerText = stats.totalMins;
+  document.getElementById("statSessions").innerText = stats.sessions;
+  const done = tasks.filter(t=>t.completed && !t.deleted).length, total = tasks.filter(t=>!t.deleted).length;
+  const pct = total === 0 ? 0 : Math.round((done/total)*100);
+  document.getElementById("progressFill").style.width = pct + "%";
+  document.getElementById("progressText").innerText = pct + "% Complete";
+}
+
+/* THEME & TIMETABLE */
+function toggleDarkMode() { 
+    document.body.classList.toggle("dark-mode"); 
+    localStorage.setItem("studyflow_theme", document.body.classList.contains("dark-mode") ? "dark" : "light"); 
+}
+
+function initTimetable() {
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  document.getElementById("daySelector").innerHTML = days.map(day => 
+    `<div class="day-chip ${day === currentSchedDay ? 'active' : ''}" onclick="setSchedDay('${day}')">${day}</div>`
+  ).join('');
+  renderTimetable();
+}
+
+function setSchedDay(day) { 
+  currentSchedDay = day; 
+  initTimetable(); 
+}
+
+function addScheduleItem() {
+  const time = document.getElementById("schedTime").value, activity = document.getElementById("schedActivity").value;
+  if(!time || !activity) return;
+  let s = JSON.parse(localStorage.getItem(SCHED_KEY)) || {};
+  if(!s[currentSchedDay]) s[currentSchedDay] = [];
+  s[currentSchedDay].push({ id: Date.now(), time, activity });
+  s[currentSchedDay].sort((a,b) => a.time.localeCompare(b.time));
+  localStorage.setItem(SCHED_KEY, JSON.stringify(s));
+  document.getElementById("schedActivity").value = ""; renderTimetable();
+}
+
+function renderTimetable() {
+  const s = JSON.parse(localStorage.getItem(SCHED_KEY)) || {}, data = s[currentSchedDay] || [];
+  document.getElementById("timetableDisplay").innerHTML = data.map(i => `
+    <div class="schedule-block" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+      <div>
+        <small style="color:#2ed573; font-weight:bold;">${i.time}</small><br>
+        <b>${i.activity}</b>
+      </div>
+      <button onclick="deleteSchedItem(${i.id})" style="background:none; border:none; color:#ff4757; font-size:18px; cursor:pointer;">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>`).join('') || "<p style='text-align:center; color:#888; padding:20px;'>Free day!</p>";
+}
+
+function deleteSchedItem(id) {
+  let s = JSON.parse(localStorage.getItem(SCHED_KEY)) || {};
+  if (s[currentSchedDay]) {
+    s[currentSchedDay] = s[currentSchedDay].filter(item => item.id !== id);
+    localStorage.setItem(SCHED_KEY, JSON.stringify(s));
+    renderTimetable();
+  }
+}
+
+function resetForm() { document.getElementById("subject").value = ""; document.getElementById("title").value = ""; }
+
+window.onload = () => { 
+    if(localStorage.getItem("studyflow_theme") === "dark") document.body.classList.add("dark-mode");
+    renderAll(); initTimetable(); updateTimerDisplay(); renderDiary();
+};
+</script>
+</body>
+</html>
